@@ -58,8 +58,11 @@ class Blockchain:
     
     def add_transaction(self, sender, receiver, amount):
         self.transactions.append({'sender':sender, 'receiver':receiver, 'amount':amount})
-        previous_block=self.get_previous_block()
-        return previous_block['index']+1
+        network = self.nodes
+        for node in network:
+            url = 'http://'+str(node)+'/add_trans'
+            param = {'sender':sender, 'receiver':receiver, 'amount':amount}
+            requests.post(url, json = param)
     
     def add_node(self, address):
         parsed_url=urlparse(address)
@@ -97,7 +100,7 @@ def mine_block():
     previous_proof=previous_block['proof']
     proof=blockchain.proof_of_work(previous_proof)
     previous_hash=blockchain.hash(previous_block)
-    blockchain.add_transaction(sender=node_address, receiver='Shanthala', amount=1)
+    blockchain.add_transaction(sender=node_address, receiver='node3', amount=1)
     block=blockchain.create_block(proof,previous_hash)
     response={'message':'Congratulations, you just mined a block',
               'index':block['index'],
@@ -127,8 +130,8 @@ def add_transaction():
     transaction_keys=['sender', 'receiver', 'amount']
     if not all (key in json for key in transaction_keys):
         return 'Some elements of the transaction are missing', 400
-    index=blockchain.add_transaction(json['sender'],json['receiver'],json['amount'])
-    response={'message':f'This transaction will be added to block {index}'}
+    blockchain.add_transaction(json['sender'],json['receiver'],json['amount'])
+    response={'message':'This transaction will be added to block'}
     return jsonify(response), 201
     
 @app.route('/connect_node', methods=['POST'])
@@ -153,6 +156,17 @@ def replace_chain():
         response={'message':'No change. The chain is the largest one',
                   'actual_chain':blockchain.chain}
     return jsonify(response), 200
+
+@app.route('/add_trans', methods=['POST'])
+def add_trans():
+    json=request.get_json()
+    transaction_keys=['sender', 'receiver', 'amount']
+    if not all (key in json for key in transaction_keys):
+        return 'Some elements of the transaction are missing', 400
+    blockchain.transactions.append({'sender':json['sender'], 'receiver':json['receiver'], 'amount':json['amount']})
+    response={'message':'This transaction will be added to block'}
+    return jsonify(response), 201
+
 
 app.run(host='0.0.0.0', port=5003)
 
