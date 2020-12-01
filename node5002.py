@@ -9,32 +9,38 @@ class Blockchain:
     def __init__(self):
         self.chain=[]
         self.transactions=[]
-        self.create_block(proof=1, previous_hash='0')
+        genesis=self.contents_block(previous_hash='0')
+        self.proof_of_work(genesis)
+        self.create_block(genesis)
         self.nodes=set()
-    
-    def create_block(self,proof,previous_hash):
-        block={'index':len(self.chain)+1,
+        
+    def contents_block(self,previous_hash):
+        block_contents={'index':len(self.chain)+1,
                'timestamp':str(datetime.datetime.now()),
-               'proof':proof,
                'previous_hash':previous_hash,
-               'transactions':self.transactions}
+               'transactions':self.transactions
+               }
         self.transactions=[]
-        self.chain.append(block)
-        return block
+        return block_contents
+        
+    
+    def create_block(self,block_contents):
+        self.chain.append(block_contents)
+        return block_contents
     
     def get_previous_block(self):
         return self.chain[-1]
     
-    def proof_of_work(self, previous_proof):
-        new_proof=1
+    def proof_of_work(self, blockcontents):
+        hash_operation=None
+        blockcontents['proof']=1
         check_proof=False
         while(check_proof is False):
-            hash_operation=hashlib.sha256(str(new_proof**2 - previous_proof**2).encode()).hexdigest()
+            hash_operation=self.hash(blockcontents)
             if hash_operation[:4]=='0000':
                 check_proof=True
             else:
-                new_proof+=1
-        return new_proof
+                blockcontents['proof']+=1   
     
     def hash(self, block):
         encoded_block=json.dumps(block, sort_keys=True).encode()
@@ -47,9 +53,7 @@ class Blockchain:
             block=chain[block_index]
             if block['previous_hash'] != self.hash(previous_block):
                 return False
-            previous_proof=previous_block['proof']
-            proof=block['proof']
-            hash_operation=hashlib.sha256(str(proof**2 - previous_proof**2).encode()).hexdigest()
+            hash_operation=self.hash(block)
             if hash_operation[:4] != '0000':
                 return False
             previous_block=block
@@ -96,12 +100,12 @@ blockchain=Blockchain()
 
 @app.route('/mine_block', methods=['GET'])
 def mine_block():
+    blockchain.transactions.append({'sender':node_address, 'receiver':'node2', 'amount':1})
     previous_block=blockchain.get_previous_block()
-    previous_proof=previous_block['proof']
-    proof=blockchain.proof_of_work(previous_proof)
     previous_hash=blockchain.hash(previous_block)
-    blockchain.add_transaction(sender=node_address, receiver='Spoothi', amount=1)
-    block=blockchain.create_block(proof,previous_hash)
+    contentsofblock=blockchain.contents_block(previous_hash)
+    blockchain.proof_of_work(contentsofblock)
+    block=blockchain.create_block(contentsofblock)
     response={'message':'Congratulations, you just mined a block',
               'index':block['index'],
               'timestamp':block['timestamp'],
@@ -166,7 +170,6 @@ def add_trans():
     blockchain.transactions.append({'sender':json['sender'], 'receiver':json['receiver'], 'amount':json['amount']})
     response={'message':'This transaction will be added to block'}
     return jsonify(response), 201
-
 
 app.run(host='0.0.0.0', port=5002)
 
