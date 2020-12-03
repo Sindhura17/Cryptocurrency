@@ -9,6 +9,8 @@ class Blockchain:
     def __init__(self):
         self.chain=[]
         self.transactions=[]
+        self.difficulty=4
+        self.hash_pattern='0'
         genesis=self.contents_block(previous_hash='0')
         self.proof_of_work(genesis)
         self.create_block(genesis)
@@ -37,7 +39,7 @@ class Blockchain:
         check_proof=False
         while(check_proof is False):
             hash_operation=self.hash(blockcontents)
-            if hash_operation[:4]=='0000':
+            if hash_operation[:4]==(self.hash_pattern*self.difficulty):
                 check_proof=True
             else:
                 blockcontents['proof']+=1   
@@ -54,7 +56,7 @@ class Blockchain:
             if block['previous_hash'] != self.hash(previous_block):
                 return False
             hash_operation=self.hash(block)
-            if hash_operation[:4] != '0000':
+            if hash_operation[:4] != self.hash_pattern*self.difficulty:
                 return False
             previous_block=block
             block_index+=1
@@ -88,6 +90,9 @@ class Blockchain:
             self.chain = longest_chain
             return True
         return False
+    
+    def showpending_transactions(self):
+        return self.transactions
             
         
     
@@ -170,6 +175,18 @@ def add_trans():
     blockchain.transactions.append({'sender':json['sender'], 'receiver':json['receiver'], 'amount':json['amount']})
     response={'message':'This transaction will be added to block'}
     return jsonify(response), 201
+
+
+@app.route('/show_transactions', methods=['GET'])
+def show_transactions():
+    pending_transactions = blockchain.showpending_transactions()
+    if len(pending_transactions)==0:
+        response={'message':'There are no pending transactions',
+                  'pending_transactions':pending_transactions}
+    else:
+        response={'pending_transactions': pending_transactions}
+    return jsonify(response), 200
+
 
 app.run(host='0.0.0.0', port=5001)
 

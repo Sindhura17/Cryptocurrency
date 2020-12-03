@@ -9,6 +9,8 @@ class Blockchain:
     def __init__(self):
         self.chain=[]
         self.transactions=[]
+        self.difficulty=4
+        self.hash_pattern='0'
         genesis=self.contents_block(previous_hash='0')
         self.proof_of_work(genesis)
         self.create_block(genesis)
@@ -37,7 +39,7 @@ class Blockchain:
         check_proof=False
         while(check_proof is False):
             hash_operation=self.hash(blockcontents)
-            if hash_operation[:4]=='0000':
+            if hash_operation[:4]==self.hash_pattern*self.difficulty:
                 check_proof=True
             else:
                 blockcontents['proof']+=1   
@@ -54,7 +56,7 @@ class Blockchain:
             if block['previous_hash'] != self.hash(previous_block):
                 return False
             hash_operation=self.hash(block)
-            if hash_operation[:4] != '0000':
+            if hash_operation[:4] !=self.hash_pattern*self.difficulty:
                 return False
             previous_block=block
             block_index+=1
