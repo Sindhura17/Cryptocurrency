@@ -9,10 +9,12 @@ class Blockchain:
     def __init__(self):
         self.chain=[]
         self.transactions=[]
+        self.difficulty=4
+        self.hash_pattern='0'
+        self.nodes=set()
         genesis=self.contents_block(previous_hash='0')
         self.proof_of_work(genesis)
         self.create_block(genesis)
-        self.nodes=set()
         
     def contents_block(self,previous_hash):
         block_contents={'index':len(self.chain)+1,
@@ -21,8 +23,12 @@ class Blockchain:
                'transactions':self.transactions
                }
         self.transactions=[]
+        network = self.nodes
+        for node in network:
+            url = 'http://'+str(node)+'/update_trans_list'
+            param = {'key':None}
+            requests.post(url, json = param)
         return block_contents
-        
     
     def create_block(self,block_contents):
         self.chain.append(block_contents)
@@ -37,7 +43,7 @@ class Blockchain:
         check_proof=False
         while(check_proof is False):
             hash_operation=self.hash(blockcontents)
-            if hash_operation[:4]=='0000':
+            if hash_operation[:4]==self.hash_pattern*self.difficulty:
                 check_proof=True
             else:
                 blockcontents['proof']+=1   
@@ -54,19 +60,26 @@ class Blockchain:
             if block['previous_hash'] != self.hash(previous_block):
                 return False
             hash_operation=self.hash(block)
-            if hash_operation[:4] != '0000':
+            if hash_operation[:4] !=self.hash_pattern*self.difficulty:
                 return False
             previous_block=block
             block_index+=1
         return True
     
-    def add_transaction(self, sender, receiver, amount):
-        self.transactions.append({'sender':sender, 'receiver':receiver, 'amount':amount})
+    def add_transactions(self, sender, receiver, amount):
+        self.add_transaction(sender, receiver, amount)
         network = self.nodes
         for node in network:
-            url = 'http://'+str(node)+'/add_trans'
+            url = 'http://'+str(node)+'/update_trans_list'
             param = {'sender':sender, 'receiver':receiver, 'amount':amount}
             requests.post(url, json = param)
+            
+    def add_transaction(self, sender, receiver, amount):
+        trans={'sender':sender, 'receiver':receiver, 'amount':amount}
+        trans['timestamp']=str(datetime.datetime.now())
+        trans_hash=self.hash(trans)
+        trans['trans_hash']=trans_hash
+        self.transactions.append(trans)
     
     def add_node(self, address):
         parsed_url=urlparse(address)
@@ -87,8 +100,17 @@ class Blockchain:
         if longest_chain:
             self.chain = longest_chain
             return True
-        return False
-            
+        return False     
+    
+    def has_valid_transactions(self):
+        for i in self.transactions:
+            trans={'sender':i['sender'], 'receiver':i['receiver'], 'amount':i['amount'], 'timestamp':i['timestamp']}
+            if i['trans_hash'] != self.hash(trans):
+                return False
+        return True
+    
+    def showpending_transactions(self):
+        return self.transactions
         
     
 #flask application   
@@ -100,7 +122,9 @@ blockchain=Blockchain()
 
 @app.route('/mine_block', methods=['GET'])
 def mine_block():
-    blockchain.transactions.append({'sender':node_address, 'receiver':'node2', 'amount':1})
+    if not blockchain.has_valid_transactions():
+        return 'Some transaction are modified', 400
+    blockchain.add_transaction(node_address, 'node3', 1)
     previous_block=blockchain.get_previous_block()
     previous_hash=blockchain.hash(previous_block)
     contentsofblock=blockchain.contents_block(previous_hash)
@@ -134,7 +158,7 @@ def add_transaction():
     transaction_keys=['sender', 'receiver', 'amount']
     if not all (key in json for key in transaction_keys):
         return 'Some elements of the transaction are missing', 400
-    blockchain.add_transaction(json['sender'],json['receiver'],json['amount'])
+    blockchain.add_transactions(json['sender'],json['receiver'],json['amount'])
     response={'message':'This transaction will be added to block'}
     return jsonify(response), 201
     
@@ -161,15 +185,30 @@ def replace_chain():
                   'actual_chain':blockchain.chain}
     return jsonify(response), 200
 
-@app.route('/add_trans', methods=['POST'])
-def add_trans():
+@app.route('/update_trans_list', methods=['POST'])
+def update_trans_list():
     json=request.get_json()
+    if 'key' in json and json['key']==None:
+        blockchain.transactions.clear()
+        return 'All transactions removed', 200
     transaction_keys=['sender', 'receiver', 'amount']
     if not all (key in json for key in transaction_keys):
         return 'Some elements of the transaction are missing', 400
-    blockchain.transactions.append({'sender':json['sender'], 'receiver':json['receiver'], 'amount':json['amount']})
+    blockchain.add_transaction(json['sender'],json['receiver'],json['amount'])
     response={'message':'This transaction will be added to block'}
     return jsonify(response), 201
+
+
+@app.route('/show_transactions', methods=['GET'])
+def show_transactions():
+    pending_transactions = blockchain.showpending_transactions()
+    if len(pending_transactions)==0:
+        response={'message':'There are no pending transactions',
+                  'pending_transactions':pending_transactions}
+    else:
+        response={'pending_transactions': pending_transactions}
+    return jsonify(response), 200
+
 
 app.run(host='0.0.0.0', port=5002)
 
