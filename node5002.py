@@ -5,16 +5,35 @@ from flask import Flask, jsonify, request
 import requests
 from uuid import uuid4
 from urllib.parse import urlparse
+import Crypto
+from Crypto.PublicKey import RSA
+from Crypto import Random
+import base64
 class Blockchain:
+    def rsakeys(self):  
+         length=2048  
+         privatekey = RSA.generate(length, Random.new().read)  
+         publickey = privatekey.publickey()  
+         return privatekey, publickey
+     
     def __init__(self):
         self.chain=[]
         self.transactions=[]
         self.difficulty=4
         self.hash_pattern='0'
         self.nodes=set()
+        keys=self.rsakeys()
+        self.privatekey=keys[0]
+        self.publickey=keys[1]
         genesis=self.contents_block(previous_hash='0')
         self.proof_of_work(genesis)
         self.create_block(genesis)
+ 
+    def sign(privatekey,data):
+        return base64.b64encode(str((privatekey.sign(data,''))[0]).encode())
+
+    def verify(publickey,data,sign):
+        return publickey.verify(data,(int(base64.b64decode(sign)),))
         
     def contents_block(self,previous_hash):
         block_contents={'index':len(self.chain)+1,
@@ -67,18 +86,19 @@ class Blockchain:
         return True
     
     def add_transactions(self, sender, receiver, amount):
-        self.add_transaction(sender, receiver, amount)
-        network = self.nodes
-        for node in network:
-            url = 'http://'+str(node)+'/update_trans_list'
-            param = {'sender':sender, 'receiver':receiver, 'amount':amount}
-            requests.post(url, json = param)
-            
-    def add_transaction(self, sender, receiver, amount):
         trans={'sender':sender, 'receiver':receiver, 'amount':amount}
         trans['timestamp']=str(datetime.datetime.now())
         trans_hash=self.hash(trans)
         trans['trans_hash']=trans_hash
+        trans['signature']=self.sign(self.privatekey,trans_hash)
+        self.add_transaction(trans)
+        network = self.nodes
+        for node in network:
+            url = 'http://'+str(node)+'/update_trans_list'
+            param = {'trans':trans}
+            requests.post(url, json = param)
+            
+    def add_transaction(self, trans):
         self.transactions.append(trans)
     
     def add_node(self, address):
@@ -105,7 +125,8 @@ class Blockchain:
     def has_valid_transactions(self):
         for i in self.transactions:
             trans={'sender':i['sender'], 'receiver':i['receiver'], 'amount':i['amount'], 'timestamp':i['timestamp']}
-            if i['trans_hash'] != self.hash(trans):
+            verified=self.verify(i['sender'], i['trans_hash'], i['signature'])
+            if i['trans_hash'] != self.hash(trans) or not verified:
                 return False
         return True
     
@@ -124,7 +145,7 @@ blockchain=Blockchain()
 def mine_block():
     if not blockchain.has_valid_transactions():
         return 'Some transaction are modified', 400
-    blockchain.add_transaction(node_address, 'node2', 1)
+    blockchain.add_transactions(node_address, blockchain.publickey, 1)
     previous_block=blockchain.get_previous_block()
     previous_hash=blockchain.hash(previous_block)
     contentsofblock=blockchain.contents_block(previous_hash)
@@ -191,10 +212,9 @@ def update_trans_list():
     if 'key' in json and json['key']==None:
         blockchain.transactions.clear()
         return 'All transactions removed', 200
-    transaction_keys=['sender', 'receiver', 'amount']
-    if not all (key in json for key in transaction_keys):
+    if 'trans' not in json:
         return 'Some elements of the transaction are missing', 400
-    blockchain.add_transaction(json['sender'],json['receiver'],json['amount'])
+    blockchain.add_transaction(json['trans'])
     response={'message':'This transaction will be added to block'}
     return jsonify(response), 201
 
