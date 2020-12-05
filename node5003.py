@@ -11,8 +11,9 @@ import base64
 class Blockchain:
     def rsakeys(self):  
          length=2048  
-         privatekey = RSA.generate(length, Random.new().read)  
-         publickey = privatekey.publickey()  
+         key = RSA.generate(length, Random.new().read)
+         privatekey=key.exportKey()
+         publickey = key.publickey().exportKey()  
          return privatekey, publickey
      
     def __init__(self):
