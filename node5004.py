@@ -24,7 +24,7 @@ class Blockchain:
         keys=self.rsakeys()
         self.privatekey=keys[0]
         self.publickey=keys[1]
-        print("Publickey of the node is : "+self.publickey)
+        print("Publickey of the node is : "+str(self.publickey))
         genesis=self.contents_block(previous_hash='0')
         self.proof_of_work(genesis)
         self.create_block(genesis)
