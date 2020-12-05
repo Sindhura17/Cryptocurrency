@@ -5,7 +5,6 @@ from flask import Flask, jsonify, request
 import requests
 from uuid import uuid4
 from urllib.parse import urlparse
-import Crypto
 from Crypto.PublicKey import RSA
 from Crypto import Random
 import base64
@@ -25,6 +24,7 @@ class Blockchain:
         keys=self.rsakeys()
         self.privatekey=keys[0]
         self.publickey=keys[1]
+        print("Publickey of the node is : "+str(self.publickey))
         genesis=self.contents_block(previous_hash='0')
         self.proof_of_work(genesis)
         self.create_block(genesis)
@@ -85,7 +85,9 @@ class Blockchain:
             block_index+=1
         return True
     
-    def add_transactions(self, sender, receiver, amount):
+    def add_transactions(self, receiver, amount, sender=""):
+        if sender=="":
+            sender=self.publickey
         trans={'sender':sender, 'receiver':receiver, 'amount':amount}
         trans['timestamp']=str(datetime.datetime.now())
         trans_hash=self.hash(trans)
@@ -145,7 +147,7 @@ blockchain=Blockchain()
 def mine_block():
     if not blockchain.has_valid_transactions():
         return 'Some transaction are modified', 400
-    blockchain.add_transactions(node_address, blockchain.publickey, 1)
+    blockchain.add_transactions(blockchain.publickey, 1, node_address)
     previous_block=blockchain.get_previous_block()
     previous_hash=blockchain.hash(previous_block)
     contentsofblock=blockchain.contents_block(previous_hash)
@@ -176,10 +178,10 @@ def is_valid():
 @app.route('/add_transaction', methods=['POST'])
 def add_transaction():
     json=request.get_json()
-    transaction_keys=['sender', 'receiver', 'amount']
+    transaction_keys=['receiver', 'amount']
     if not all (key in json for key in transaction_keys):
         return 'Some elements of the transaction are missing', 400
-    blockchain.add_transactions(json['sender'],json['receiver'],json['amount'])
+    blockchain.add_transactions(json['receiver'],json['amount'])
     response={'message':'This transaction will be added to block'}
     return jsonify(response), 201
     
