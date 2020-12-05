@@ -6,15 +6,18 @@ import requests
 from uuid import uuid4
 from urllib.parse import urlparse
 from Crypto.PublicKey import RSA
-from Crypto import Random
+#from Crypto import Random
 import base64
+#from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
+#import binascii
+
 class Blockchain:
     def rsakeys(self):  
          length=2048  
-         key = RSA.generate(length, Random.new().read)
-         privatekey=key.exportKey()
-         publickey = key.publickey().exportKey()  
-         return privatekey, publickey
+         key = RSA.generate(length)
+         #privatekey=key.exportKey()
+         publickey = key.publickey()  
+         return key, publickey
      
     def __init__(self):
         self.chain=[]
@@ -30,10 +33,10 @@ class Blockchain:
         self.proof_of_work(genesis)
         self.create_block(genesis)
  
-    def sign(privatekey,data):
+    def sign(self, privatekey, data):
         return base64.b64encode(str((privatekey.sign(data,''))[0]).encode())
 
-    def verify(publickey,data,sign):
+    def verify(self, publickey, data,sign):
         return publickey.verify(data,(int(base64.b64decode(sign)),))
         
     def contents_block(self,previous_hash):
@@ -88,7 +91,7 @@ class Blockchain:
     
     def add_transactions(self, receiver, amount, sender=""):
         if sender=="":
-            sender=self.publickey
+            sender=str(self.publickey)
         trans={'sender':sender, 'receiver':receiver, 'amount':amount}
         trans['timestamp']=str(datetime.datetime.now())
         trans_hash=self.hash(trans)

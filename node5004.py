@@ -30,10 +30,10 @@ class Blockchain:
         self.proof_of_work(genesis)
         self.create_block(genesis)
  
-    def sign(privatekey,data):
+    def sign(self, privatekey, data):
         return base64.b64encode(str((privatekey.sign(data,''))[0]).encode())
 
-    def verify(publickey,data,sign):
+    def verify(self, publickey, data,sign):
         return publickey.verify(data,(int(base64.b64decode(sign)),))
         
     def contents_block(self,previous_hash):

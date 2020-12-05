@@ -1,5 +1,4 @@
 {
-    "sender": "abc",
-    "receiver": "def",
+    "receiver": ,
     "amount":100
 }
