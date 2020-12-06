@@ -6,17 +6,17 @@ import requests
 from uuid import uuid4
 from urllib.parse import urlparse
 from Crypto.PublicKey import RSA
-#from Crypto import Random
+from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
+import binascii
 import base64
-#from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
-#import binascii
+
 
 class Blockchain:
     def rsakeys(self):  
          length=2048  
          key = RSA.generate(length)
          #privatekey=key.exportKey()
-         publickey = key.publickey()  
+         publickey = key.publickey().export_key()
          return key, publickey
      
     def __init__(self):
