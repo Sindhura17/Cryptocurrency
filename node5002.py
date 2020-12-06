@@ -9,11 +9,12 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
 from Crypto.Hash import SHA256
 import base64
+import jsonpickle
 
 
 class Blockchain:
     def rsakeys(self):  
-         length=1024  
+         length=2048  
          key = RSA.generate(length)
          #privatekey=key.exportKey()
          publickey = key.publickey().exportKey()
@@ -40,6 +41,7 @@ class Blockchain:
         pk1 = RSA.import_key(publickey);
         try:
             verifier = PKCS115_SigScheme(pk1)
+            verified=verifier.verify(data,sign)
             return True
         except:
             return False
@@ -108,13 +110,12 @@ class Blockchain:
         trans_hash=self.transhash(transtemp)
         trans['trans_hash']=trans_hash
         trans['signature']=self.sign(self.privatekey,trans_hash)
-        #trans['trans_hash']=str(trans_hash)
-        #trans['signature']=str(trans['signature'])
         self.add_transaction(trans)
         network = self.nodes
         for node in network:
             url = 'http://'+str(node)+'/update_trans_list'
-            param = {'trans':trans}
+            frozen = jsonpickle.encode(trans)
+            param = {'trans':frozen}
             requests.post(url, json = param)
             
     def add_transaction(self, trans):
@@ -144,13 +145,8 @@ class Blockchain:
     def has_valid_transactions(self):
         for i in self.transactions:
             trans={'sender':str(i['sender']), 'receiver':i['receiver'], 'amount':i['amount'], 'timestamp':i['timestamp']}
-            #verified=self.verify(i['sender'], i['trans_hash'], i['signature'])
-            #verifier = PKCS115_SigScheme(i['sender'])
-            #verified=verifier.verify(i['trans_hash'], i['signature'])
             verified=self.verify(i['sender'],i['trans_hash'], i['signature'])
-            print(i['trans_hash'].hexdigest())
-            print(self.transhash(trans).hexdigest())
-            if i['trans_hash'].hexdigest() != self.transhash(trans).hexdigest() or not verified:
+            if i['trans_hash'] != self.transhash(trans) or not verified:
                 return False
         return True
     
@@ -238,7 +234,8 @@ def update_trans_list():
         return 'All transactions removed', 200
     if 'trans' not in json:
         return 'Some elements of the transaction are missing', 400
-    blockchain.add_transaction(json['trans'])
+    thawed = jsonpickle.decode(json['trans'])
+    blockchain.add_transaction(thawed)
     response={'message':'This transaction will be added to block'}
     return jsonify(response), 201
 
