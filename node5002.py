@@ -34,8 +34,9 @@ class Blockchain:
         self.create_block(genesis)
  
     def sign(self, privatekey, data):
-        return base64.b64encode(str((privatekey.sign(data,''))[0]).encode())
-
+        signer = PKCS115_SigScheme(privatekey)
+        return signer.sign(data)
+    
     def verify(self, publickey, data,sign):
         return publickey.verify(data,(int(base64.b64decode(sign)),))
         
@@ -131,7 +132,9 @@ class Blockchain:
     def has_valid_transactions(self):
         for i in self.transactions:
             trans={'sender':i['sender'], 'receiver':i['receiver'], 'amount':i['amount'], 'timestamp':i['timestamp']}
-            verified=self.verify(i['sender'], i['trans_hash'], i['signature'])
+            #verified=self.verify(i['sender'], i['trans_hash'], i['signature'])
+            verifier = PKCS115_SigScheme(i['sender'])
+            verified=verifier.verify(i['trans_hash'], i['signature'])
             if i['trans_hash'] != self.hash(trans) or not verified:
                 return False
         return True
