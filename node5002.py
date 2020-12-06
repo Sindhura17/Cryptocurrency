@@ -8,12 +8,11 @@ from urllib.parse import urlparse
 from Crypto.PublicKey import RSA
 from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
 from Crypto.Hash import SHA256
-import base64
-
+import ast
 
 class Blockchain:
     def rsakeys(self):  
-         length=1024  
+         length=2048  
          key = RSA.generate(length)
          #privatekey=key.exportKey()
          publickey = key.publickey().exportKey()
@@ -40,6 +39,7 @@ class Blockchain:
         pk1 = RSA.import_key(publickey);
         try:
             verifier = PKCS115_SigScheme(pk1)
+            verifier.verify(data, sign)
             return True
         except:
             return False
@@ -55,7 +55,7 @@ class Blockchain:
         for node in network:
             url = 'http://'+str(node)+'/update_trans_list'
             param = {'key':None}
-            requests.post(url, json = param)
+            requests.post(url, data = param)
         return block_contents
     
     def create_block(self,block_contents):
@@ -114,8 +114,8 @@ class Blockchain:
         network = self.nodes
         for node in network:
             url = 'http://'+str(node)+'/update_trans_list'
-            param = {'trans':trans}
-            requests.post(url, json = param)
+            #param = {'trans':trans}
+            requests.post(url, data = str(trans))
             
     def add_transaction(self, trans):
         self.transactions.append(trans)
@@ -232,16 +232,20 @@ def replace_chain():
 
 @app.route('/update_trans_list', methods=['POST'])
 def update_trans_list():
-    json=request.get_json()
-    if 'key' in json and json['key']==None:
+    '''json=request.get_json()'''
+    #json=request.data
+    bytestr=request.data
+    dicstr=bytestr.decode('utf-8')
+    data=ast.literal_eval(dicstr)
+    print(data)
+    '''if 'key' in json and json['key']==None:
         blockchain.transactions.clear()
         return 'All transactions removed', 200
     if 'trans' not in json:
         return 'Some elements of the transaction are missing', 400
-    blockchain.add_transaction(json['trans'])
+    blockchain.add_transaction(json['trans'])'''
     response={'message':'This transaction will be added to block'}
     return jsonify(response), 201
-
 
 @app.route('/show_transactions', methods=['GET'])
 def show_transactions():
