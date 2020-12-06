@@ -9,6 +9,9 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
 from Crypto.Hash import SHA256
 import ast
+import base64
+import jsonpickle
+
 
 class Blockchain:
     def rsakeys(self):  
@@ -36,7 +39,7 @@ class Blockchain:
         return signer.sign(data)
     
     def verify(self, publickey, data,sign):
-        pk1 = RSA.import_key(publickey);
+        pk1 = RSA.import_key(publickey)
         try:
             verifier = PKCS115_SigScheme(pk1)
             verifier.verify(data, sign)
@@ -114,8 +117,9 @@ class Blockchain:
         network = self.nodes
         for node in network:
             url = 'http://'+str(node)+'/update_trans_list'
-            #param = {'trans':trans}
-            requests.post(url, data = str(trans))
+            frozen = jsonpickle.encode(trans)
+            param = {'trans':frozen}
+            requests.post(url, json = param)
             
     def add_transaction(self, trans):
         self.transactions.append(trans)
@@ -148,8 +152,6 @@ class Blockchain:
             #verifier = PKCS115_SigScheme(i['sender'])
             #verified=verifier.verify(i['trans_hash'], i['signature'])
             verified=self.verify(i['sender'],i['trans_hash'], i['signature'])
-            print(i['trans_hash'].hexdigest())
-            print(self.transhash(trans).hexdigest())
             if i['trans_hash'].hexdigest() != self.transhash(trans).hexdigest() or not verified:
                 return False
         return True
@@ -243,7 +245,8 @@ def update_trans_list():
         return 'All transactions removed', 200
     if 'trans' not in json:
         return 'Some elements of the transaction are missing', 400
-    blockchain.add_transaction(json['trans'])'''
+    thawed = jsonpickle.decode(json['trans'])
+    blockchain.add_transaction(thawed)
     response={'message':'This transaction will be added to block'}
     return jsonify(response), 201
 
@@ -256,7 +259,6 @@ def show_transactions():
     else:
         response={'pending_transactions': pending_transactions}
     return jsonify(response), 200
-
 
 app.run(host='0.0.0.0', port=5003)
 
