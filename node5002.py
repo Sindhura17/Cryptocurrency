@@ -22,6 +22,7 @@ class Blockchain:
         self.transactions=[]
         self.difficulty=4
         self.hash_pattern='0'
+        self.balancecurrency=100
         self.nodes=set()
         keys=self.rsakeys()
         self.privatekey=keys[0]
@@ -113,7 +114,6 @@ class Blockchain:
         signature=self.sign(self.privatekey,trans_hash)
         trans['signature']=signature
         transtemp['signature']=signature
-        print(transtemp)
         self.transactions.append(trans)
         network = self.nodes
         for node in network:
@@ -166,10 +166,11 @@ class Blockchain:
     def balance(self):
         for block in self.chain:
             trans=block['transactions']
+            sender=b64encode(self.publickey).decode('ASCII')
             for transaction in trans:
-                if transaction['sender']==str(self.publickey):
+                if transaction['sender']==sender:
                     self.balancecurrency= self.balancecurrency-transaction['amount']
-                elif transaction['receiver']==str(self.publickey):
+                elif transaction['receiver']==sender:
                     self.balancecurrency= self.balancecurrency+transaction['amount']
         return self.balancecurrency
         
@@ -272,7 +273,20 @@ def show_transactions():
     else:
         response={'pending_transactions': pending_transactions}
     return jsonify(response), 200
-
+    
+@app.route('/calculate_balance', methods=['GET'])
+def calculate_balance():
+    get_balance=blockchain.balance()
+    response={'balance':get_balance,}
+    return jsonify(response), 200
+    
+    
+@app.route('/show_publickey', methods=['GET'])
+def show_publickey():
+    publickey=b64encode(blockchain.publickey).decode('ASCII')
+    response={'publickey':publickey,}
+    return jsonify(response), 200
+    
 
 app.run(host='0.0.0.0', port=5002)
 
