@@ -6,14 +6,15 @@ import requests
 from uuid import uuid4
 from urllib.parse import urlparse
 from Crypto.PublicKey import RSA
-from Crypto import Random
-import base64
+from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
+from Crypto.Hash import SHA256
+from base64 import b64encode, b64decode
+
+
 class Blockchain:
     def rsakeys(self):  
-         length=2048  
-         key = RSA.generate(length, Random.new().read)
-         privatekey=key.exportKey()
-         publickey = key.publickey().exportKey()  
+         privatekey = RSA.generate(2048)
+         publickey = privatekey.publickey().exportKey()
          return privatekey, publickey
      
     def __init__(self):
@@ -25,18 +26,29 @@ class Blockchain:
         keys=self.rsakeys()
         self.privatekey=keys[0]
         self.publickey=keys[1]
-        print("Publickey of the node is : "+str(self.publickey))
         genesis=self.contents_block(previous_hash='0')
         self.proof_of_work(genesis)
         self.create_block(genesis)
  
     def sign(self, privatekey, data):
-        return base64.b64encode(str((privatekey.sign(data,''))[0]).encode())
-
+        signer = PKCS115_SigScheme(privatekey)
+        signature=signer.sign(data)
+        return b64encode(signature).decode('ASCII')
+    
     def verify(self, publickey, data,sign):
-        return publickey.verify(data,(int(base64.b64decode(sign)),))
+        pubbytes = b64decode(publickey)
+        pk = RSA.import_key(pubbytes)
+        signature = b64decode(sign)
+        try:
+            verifier = PKCS115_SigScheme(pk)
+            verifier.verify(data, signature)
+            return True
+        except:
+            return False
         
     def contents_block(self,previous_hash):
+        for i in self.transactions:
+            i['trans_hash']=i['trans_hash'].hexdigest()
         block_contents={'index':len(self.chain)+1,
                'timestamp':str(datetime.datetime.now()),
                'previous_hash':previous_hash,
@@ -72,6 +84,10 @@ class Blockchain:
         encoded_block=json.dumps(block, sort_keys=True).encode()
         return hashlib.sha256(encoded_block).hexdigest()
     
+    def transhash(self,block):
+        encoded_block=json.dumps(block, sort_keys=True).encode()
+        return SHA256.new(encoded_block)
+    
     def is_chain_valid(self, chain):
         previous_block=chain[0]
         block_index=1
@@ -88,20 +104,28 @@ class Blockchain:
     
     def add_transactions(self, receiver, amount, sender=""):
         if sender=="":
-            sender=self.publickey
+            sender=b64encode(self.publickey).decode('ASCII')
         trans={'sender':sender, 'receiver':receiver, 'amount':amount}
         trans['timestamp']=str(datetime.datetime.now())
-        trans_hash=self.hash(trans)
+        transtemp=trans.copy()
+        trans_hash=self.transhash(transtemp)
         trans['trans_hash']=trans_hash
-        trans['signature']=self.sign(self.privatekey,trans_hash)
-        self.add_transaction(trans)
+        signature=self.sign(self.privatekey,trans_hash)
+        trans['signature']=signature
+        transtemp['signature']=signature
+        print(transtemp)
+        self.transactions.append(trans)
         network = self.nodes
         for node in network:
             url = 'http://'+str(node)+'/update_trans_list'
-            param = {'trans':trans}
+            param = {'trans':transtemp}
             requests.post(url, json = param)
             
     def add_transaction(self, trans):
+        transtemp=trans.copy()
+        transtemp.pop('signature')
+        print(transtemp)
+        trans['trans_hash']=self.transhash(transtemp)
         self.transactions.append(trans)
     
     def add_node(self, address):
@@ -128,13 +152,15 @@ class Blockchain:
     def has_valid_transactions(self):
         for i in self.transactions:
             trans={'sender':i['sender'], 'receiver':i['receiver'], 'amount':i['amount'], 'timestamp':i['timestamp']}
-            verified=self.verify(i['sender'], i['trans_hash'], i['signature'])
-            if i['trans_hash'] != self.hash(trans) or not verified:
+            verified=self.verify(i['sender'],i['trans_hash'], i['signature'])
+            print(i['trans_hash'].hexdigest())
+            print(self.transhash(trans).hexdigest())
+            if i['trans_hash'].hexdigest() != self.transhash(trans).hexdigest() or not verified:
                 return False
         return True
     
     def showpending_transactions(self):
-        return self.transactions
+        return str(self.transactions)
         
     
 #flask application   
@@ -148,7 +174,7 @@ blockchain=Blockchain()
 def mine_block():
     if not blockchain.has_valid_transactions():
         return 'Some transaction are modified', 400
-    blockchain.add_transactions(blockchain.publickey, 1, node_address)
+    #blockchain.add_transactions(blockchain.publickey, 1, node_address)
     previous_block=blockchain.get_previous_block()
     previous_hash=blockchain.hash(previous_block)
     contentsofblock=blockchain.contents_block(previous_hash)
@@ -212,6 +238,11 @@ def replace_chain():
 @app.route('/update_trans_list', methods=['POST'])
 def update_trans_list():
     json=request.get_json()
+    #json=request.data
+    '''bytestr=request.data
+    dicstr=bytestr.decode('utf-8')
+    data=ast.literal_eval(dicstr)
+    print(data)'''
     if 'key' in json and json['key']==None:
         blockchain.transactions.clear()
         return 'All transactions removed', 200
@@ -220,7 +251,6 @@ def update_trans_list():
     blockchain.add_transaction(json['trans'])
     response={'message':'This transaction will be added to block'}
     return jsonify(response), 201
-
 
 @app.route('/show_transactions', methods=['GET'])
 def show_transactions():

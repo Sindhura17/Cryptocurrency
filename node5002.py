@@ -8,17 +8,14 @@ from urllib.parse import urlparse
 from Crypto.PublicKey import RSA
 from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme
 from Crypto.Hash import SHA256
-import base64
-import jsonpickle
+from base64 import b64encode, b64decode
 
 
 class Blockchain:
     def rsakeys(self):  
-         length=2048  
-         key = RSA.generate(length)
-         #privatekey=key.exportKey()
-         publickey = key.publickey().exportKey()
-         return key, publickey
+         privatekey = RSA.generate(2048)
+         publickey = privatekey.publickey().exportKey()
+         return privatekey, publickey
      
     def __init__(self):
         self.chain=[]
@@ -35,22 +32,27 @@ class Blockchain:
  
     def sign(self, privatekey, data):
         signer = PKCS115_SigScheme(privatekey)
-        return signer.sign(data)
+        signature=signer.sign(data)
+        return b64encode(signature).decode('ASCII')
     
     def verify(self, publickey, data,sign):
-        pk1 = RSA.import_key(publickey);
+        pubbytes = b64decode(publickey)
+        pk = RSA.import_key(pubbytes)
+        signature = b64decode(sign)
         try:
-            verifier = PKCS115_SigScheme(pk1)
-            verified=verifier.verify(data,sign)
+            verifier = PKCS115_SigScheme(pk)
+            verifier.verify(data, signature)
             return True
         except:
             return False
         
     def contents_block(self,previous_hash):
+        for i in self.transactions:
+            i['trans_hash']=i['trans_hash'].hexdigest()
         block_contents={'index':len(self.chain)+1,
                'timestamp':str(datetime.datetime.now()),
                'previous_hash':previous_hash,
-               'transactions':str(self.transactions)
+               'transactions':self.transactions
                }
         self.transactions=[]
         network = self.nodes
@@ -102,23 +104,28 @@ class Blockchain:
     
     def add_transactions(self, receiver, amount, sender=""):
         if sender=="":
-            sender=self.publickey
+            sender=b64encode(self.publickey).decode('ASCII')
         trans={'sender':sender, 'receiver':receiver, 'amount':amount}
         trans['timestamp']=str(datetime.datetime.now())
         transtemp=trans.copy()
-        transtemp['sender']=str(transtemp['sender'])
         trans_hash=self.transhash(transtemp)
         trans['trans_hash']=trans_hash
-        trans['signature']=self.sign(self.privatekey,trans_hash)
-        self.add_transaction(trans)
+        signature=self.sign(self.privatekey,trans_hash)
+        trans['signature']=signature
+        transtemp['signature']=signature
+        print(transtemp)
+        self.transactions.append(trans)
         network = self.nodes
         for node in network:
             url = 'http://'+str(node)+'/update_trans_list'
-            frozen = jsonpickle.encode(trans)
-            param = {'trans':frozen}
+            param = {'trans':transtemp}
             requests.post(url, json = param)
             
     def add_transaction(self, trans):
+        transtemp=trans.copy()
+        transtemp.pop('signature')
+        print(transtemp)
+        trans['trans_hash']=self.transhash(transtemp)
         self.transactions.append(trans)
     
     def add_node(self, address):
@@ -144,9 +151,11 @@ class Blockchain:
     
     def has_valid_transactions(self):
         for i in self.transactions:
-            trans={'sender':str(i['sender']), 'receiver':i['receiver'], 'amount':i['amount'], 'timestamp':i['timestamp']}
+            trans={'sender':i['sender'], 'receiver':i['receiver'], 'amount':i['amount'], 'timestamp':i['timestamp']}
             verified=self.verify(i['sender'],i['trans_hash'], i['signature'])
-            if i['trans_hash'] != self.transhash(trans) or not verified:
+            print(i['trans_hash'].hexdigest())
+            print(self.transhash(trans).hexdigest())
+            if i['trans_hash'].hexdigest() != self.transhash(trans).hexdigest() or not verified:
                 return False
         return True
     
@@ -240,16 +249,19 @@ def replace_chain():
 @app.route('/update_trans_list', methods=['POST'])
 def update_trans_list():
     json=request.get_json()
+    #json=request.data
+    '''bytestr=request.data
+    dicstr=bytestr.decode('utf-8')
+    data=ast.literal_eval(dicstr)
+    print(data)'''
     if 'key' in json and json['key']==None:
         blockchain.transactions.clear()
         return 'All transactions removed', 200
     if 'trans' not in json:
         return 'Some elements of the transaction are missing', 400
-    thawed = jsonpickle.decode(json['trans'])
-    blockchain.add_transaction(thawed)
+    blockchain.add_transaction(json['trans'])
     response={'message':'This transaction will be added to block'}
     return jsonify(response), 201
-
 
 @app.route('/show_transactions', methods=['GET'])
 def show_transactions():
