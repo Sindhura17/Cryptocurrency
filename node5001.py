@@ -148,8 +148,12 @@ class Blockchain:
             #verified=self.verify(i['sender'], i['trans_hash'], i['signature'])
             #verifier = PKCS115_SigScheme(i['sender'])
             #verified=verifier.verify(i['trans_hash'], i['signature'])
+            '''print(type(i['trans_hash']))
+            print(type(self.transhash(trans)))'''
             verified=self.verify(i['sender'],i['trans_hash'], i['signature'])
-            if i['trans_hash'].hexdigest() != self.transhash(trans).hexdigest() or not verified:
+            t=i['trans_hash']
+            v=self.transhash(trans)
+            if  t.hexdigest() != v.hexdigest() or not verified:
                 return False
         return True
     
