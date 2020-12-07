@@ -25,6 +25,7 @@ class Blockchain:
         self.transactions=[]
         self.difficulty=4
         self.hash_pattern='0'
+        self.balancecurrency=100
         self.nodes=set()
         keys=self.rsakeys()
         self.privatekey=keys[0]
@@ -155,6 +156,19 @@ class Blockchain:
     
     def showpending_transactions(self):
         return str(self.transactions)
+        
+        
+    def balance(self):
+        for block in self.chain:
+            trans=block['transactions']
+            for transaction in trans:
+                if transaction['sender']==str(self.publickey):
+                    self.balancecurrency= self.balancecurrency-transaction['amount']
+                elif transaction['receiver']==str(self.publickey):
+                    self.balancecurrency= self.balancecurrency+transaction['amount']
+                    
+        return self.balancecurrency
+                
         
     
 #flask application   

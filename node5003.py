@@ -156,6 +156,17 @@ class Blockchain:
     def showpending_transactions(self):
         return str(self.transactions)
         
+        
+    def balance(self):
+        for block in self.chain:
+            trans=block['transactions']
+            for transaction in trans:
+                if transaction['sender']==str(self.publickey):
+                    self.balancecurrency= self.balancecurrency-transaction['amount']
+                elif transaction['receiver']==str(self.publickey):
+                    self.balancecurrency= self.balancecurrency+transaction['amount']           
+        return self.balancecurrency
+        
     
 #flask application   
 app=Flask(__name__)
