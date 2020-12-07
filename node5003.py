@@ -103,13 +103,11 @@ class Blockchain:
             block_index+=1
         return True
     
-    def add_transactions(self, receiver, amount, sender=""):
+    def add_transactions(self, receiver, amount):
         balanceamount=self.balance()
-        print(balanceamount)
         if balanceamount<amount:
             return False
-        if sender=="":
-            sender=b64encode(self.publickey).decode('ASCII')    
+        sender=b64encode(self.publickey).decode('ASCII')    
         trans={'sender':sender, 'receiver':receiver, 'amount':amount}
         trans['timestamp']=str(datetime.datetime.now())
         transtemp=trans.copy()
@@ -154,28 +152,36 @@ class Blockchain:
         return False     
     
     def has_valid_transactions(self):
+        invalid_trans=[]
+        j=0
         for i in self.transactions:
             trans={'sender':i['sender'], 'receiver':i['receiver'], 'amount':i['amount'], 'timestamp':i['timestamp']}
             verified=self.verify(i['sender'],i['trans_hash'], i['signature'])
-            print(i['trans_hash'].hexdigest())
-            print(self.transhash(trans).hexdigest())
-            if i['trans_hash'].hexdigest() != self.transhash(trans).hexdigest() or not verified:
-                return False
+            print(type(i['trans_hash']))
+            print(type(self.transhash(trans)))
+            if i['trans_hash'].hexdigest() != self.transhash(trans).hexdigest() or not verified or i['amount']>self.balance(i['sender']):
+                invalid_trans.append(j)
+            j+=1
+        if len(invalid_trans)==len(self.transactions):
+            return False
+        for i in invalid_trans:
+            self.transactions.pop(i)
         return True
     
     def showpending_transactions(self):
         return str(self.transactions)
         
         
-    def balance(self):
+    def balance(self, publickey=""):
         balanceamt=100
+        if publickey == "":
+            publickey=b64encode(self.publickey).decode('ASCII')
         for block in self.chain:
             trans=block['transactions']
-            sender=b64encode(self.publickey).decode('ASCII')
             for transaction in trans:
-                if transaction['sender']==sender:
+                if transaction['sender']==publickey:
                     balanceamt= balanceamt-transaction['amount']
-                elif transaction['receiver']==sender:
+                elif transaction['receiver']==publickey:
                     balanceamt= balanceamt+transaction['amount']
         self.balancecurrency=balanceamt
         return self.balancecurrency
@@ -192,7 +198,12 @@ blockchain=Blockchain()
 def mine_block():
     if not blockchain.has_valid_transactions():
         return 'Some transaction are modified', 400
-    #blockchain.add_transactions(blockchain.publickey, 1, node_address)
+    reward={'sender':node_address,
+                'receiver':b64encode(blockchain.publickey).decode('ASCII'),
+                'amount':1,
+                'timestamp':str(datetime.datetime.now())}
+    reward['trans_hash']=blockchain.transhash(reward)
+    blockchain.transactions.append(reward)
     previous_block=blockchain.get_previous_block()
     previous_hash=blockchain.hash(previous_block)
     contentsofblock=blockchain.contents_block(previous_hash)
@@ -219,7 +230,7 @@ def is_valid():
     else:
         response={'message':'The Blockchain is not valid'}
     return jsonify(response), 200
-    
+
 @app.route('/add_transaction', methods=['POST'])
 def add_transaction():
     json=request.get_json()
@@ -229,7 +240,7 @@ def add_transaction():
     success=blockchain.add_transactions(json['receiver'],json['amount'])
     if success==True:
         response={'message':'This transaction will be added to block',}
-    elif success==False:
+    else:
         response={'message':'Your balance is less than the amount!!',}
     return jsonify(response), 201
     
@@ -259,11 +270,6 @@ def replace_chain():
 @app.route('/update_trans_list', methods=['POST'])
 def update_trans_list():
     json=request.get_json()
-    #json=request.data
-    '''bytestr=request.data
-    dicstr=bytestr.decode('utf-8')
-    data=ast.literal_eval(dicstr)
-    print(data)'''
     if 'key' in json and json['key']==None:
         blockchain.transactions.clear()
         return 'All transactions removed', 200
@@ -289,15 +295,12 @@ def calculate_balance():
     response={'balance':get_balance,}
     return jsonify(response), 200
     
+    
 @app.route('/show_publickey', methods=['GET'])
 def show_publickey():
     publickey=b64encode(blockchain.publickey).decode('ASCII')
     response={'publickey':publickey,}
     return jsonify(response), 200
     
-
-app.run(host='0.0.0.0', port=5003)
-
     
-                
-                
+app.run(host='0.0.0.0', port=5003)
