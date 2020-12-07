@@ -104,8 +104,11 @@ class Blockchain:
         return True
     
     def add_transactions(self, receiver, amount, sender=""):
+        balanceamount=self.balance()
+        if balanceamount<amount:
+            return False
         if sender=="":
-            sender=b64encode(self.publickey).decode('ASCII')
+            sender=b64encode(self.publickey).decode('ASCII')    
         trans={'sender':sender, 'receiver':receiver, 'amount':amount}
         trans['timestamp']=str(datetime.datetime.now())
         transtemp=trans.copy()
@@ -120,6 +123,7 @@ class Blockchain:
             url = 'http://'+str(node)+'/update_trans_list'
             param = {'trans':transtemp}
             requests.post(url, json = param)
+        return True
             
     def add_transaction(self, trans):
         transtemp=trans.copy()
@@ -164,14 +168,16 @@ class Blockchain:
         
         
     def balance(self):
+        balanceamt=100
         for block in self.chain:
             trans=block['transactions']
             sender=b64encode(self.publickey).decode('ASCII')
             for transaction in trans:
                 if transaction['sender']==sender:
-                    self.balancecurrency= self.balancecurrency-transaction['amount']
+                    balanceamt= balanceamt-transaction['amount']
                 elif transaction['receiver']==sender:
-                    self.balancecurrency= self.balancecurrency+transaction['amount']
+                    balanceamt= balanceamt+transaction['amount']
+        self.balancecurrency=balanceamt
         return self.balancecurrency
         
     
@@ -220,8 +226,11 @@ def add_transaction():
     transaction_keys=['receiver', 'amount']
     if not all (key in json for key in transaction_keys):
         return 'Some elements of the transaction are missing', 400
-    blockchain.add_transactions(json['receiver'],json['amount'])
-    response={'message':'This transaction will be added to block'}
+    success=blockchain.add_transactions(json['receiver'],json['amount'])
+    if success==True:
+        response={'message':'This transaction will be added to block',}
+    else:
+        response={'message':'Your balance is less than the amount!!',}
     return jsonify(response), 201
     
 @app.route('/connect_node', methods=['POST'])
