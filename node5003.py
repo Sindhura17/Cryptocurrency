@@ -47,6 +47,8 @@ class Blockchain:
             return False
         
     def contents_block(self,previous_hash):
+        for i in self.transactions:
+            i['trans_hash']=i['trans_hash'].hexdigest()
         block_contents={'index':len(self.chain)+1,
                'timestamp':str(datetime.datetime.now()),
                'previous_hash':previous_hash,
