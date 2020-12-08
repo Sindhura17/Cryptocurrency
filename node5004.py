@@ -156,10 +156,11 @@ class Blockchain:
         j=0
         for i in self.transactions:
             trans={'sender':i['sender'], 'receiver':i['receiver'], 'amount':i['amount'], 'timestamp':i['timestamp']}
-            verified=self.verify(i['sender'],i['trans_hash'], i['signature'])
-            print(type(i['trans_hash']))
-            print(type(self.transhash(trans)))
-            if i['trans_hash'].hexdigest() != self.transhash(trans).hexdigest() or not verified or i['amount']>self.balance(i['sender']):
+            #print(type(i['trans_hash']))
+            #print(type(self.transhash(trans)))
+            generate_hash=self.transhash(trans)
+            verified=self.verify(i['sender'],generate_hash, i['signature'])
+            if not verified or i['amount']>self.balance(i['sender']) or i['trans_hash'].hexdigest() != generate_hash.hexdigest():
                 invalid_trans.append(j)
             j+=1
         if len(invalid_trans)==len(self.transactions):
