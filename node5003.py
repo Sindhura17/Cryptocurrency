@@ -76,7 +76,7 @@ class Blockchain:
         check_proof=False
         while(check_proof is False):
             hash_operation=self.hash(blockcontents)
-            if hash_operation[:4]==self.hash_pattern*self.difficulty:
+            if hash_operation[:self.difficulty]==self.hash_pattern*self.difficulty:
                 check_proof=True
             else:
                 blockcontents['proof']+=1   
@@ -97,7 +97,7 @@ class Blockchain:
             if block['previous_hash'] != self.hash(previous_block):
                 return False
             hash_operation=self.hash(block)
-            if hash_operation[:4] !=self.hash_pattern*self.difficulty:
+            if hash_operation[:self.difficulty] !=self.hash_pattern*self.difficulty:
                 return False
             previous_block=block
             block_index+=1
