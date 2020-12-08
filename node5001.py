@@ -1,5 +1,4 @@
 import datetime
-import hashlib
 import json
 from flask import Flask, jsonify, request
 import requests
@@ -83,7 +82,7 @@ class Blockchain:
     
     def hash(self, block):
         encoded_block=json.dumps(block, sort_keys=True).encode()
-        return hashlib.sha256(encoded_block).hexdigest()
+        return SHA256.new(encoded_block).hexdigest()
     
     def transhash(self,block):
         encoded_block=json.dumps(block, sort_keys=True).encode()
@@ -198,7 +197,7 @@ blockchain=Blockchain()
 @app.route('/mine_block', methods=['GET'])
 def mine_block():
     if not blockchain.has_valid_transactions():
-        return 'Some transaction are modified', 400
+        return jsonify({'message':'No valid transactions to mine'}), 400
     reward={'sender':node_address,
                 'receiver':b64encode(blockchain.publickey).decode('ASCII'),
                 'amount':1,
